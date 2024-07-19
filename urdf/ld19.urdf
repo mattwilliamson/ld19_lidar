@@ -5,14 +5,14 @@
     <!-- This part goes in your urdf before you include this or publish it -->
     <!-- Or you can do a static transform -->
     <!-- 
-    <joint name="ldlidar_joint" type="fixed">
+    <joint name="base_laser_joint" type="fixed">
         <parent link="base_link" />
-        <child link="ldlidar_base" />
+        <child link="laser" />
         <origin xyz="-0.119 0.0009 0.118" rpy="0 0 0" />
     </joint> 
     -->
 
-    <link name="ldlidar_base">
+    <link name="laser">
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
@@ -24,18 +24,19 @@
         </visual>
     </link>
 
-    <joint name="ldlidar_link_joint" type="fixed">
-        <parent link="ldlidar_base"/>
-        <child link="ldlidar_link"/>
+    <joint name="laser_link_joint" type="fixed">
+        <parent link="laser"/>
+        <child link="laser_link"/>
         <origin xyz="0 0 0.02745" rpy="0 0 0" />
     </joint>
 
-    <link name="ldlidar_link" />
+    <!-- This is separate so we can change the orientation in gazebo to match the real world without changing the link to base link -->
+    <link name="laser_link" />
 
-    <gazebo reference="ldlidar_link">
+    <gazebo reference="laser_link">
         <material>Gazebo/Black</material>
 
-        <sensor name="ldlidar_link" type="ray">
+        <sensor name="laser_link" type="ray">
             <pose> 0 0 0 0 0 0 </pose>
             <visualize>false</visualize>
             <update_rate>10</update_rate>
@@ -57,7 +58,7 @@
                     <argument>~/out:=scan</argument>
                 </ros>
                 <output_type>sensor_msgs/LaserScan</output_type>
-                <frame_name>ldlidar_link</frame_name>
+                <frame_name>laser_link</frame_name>
             </plugin>
         </sensor>
     </gazebo>

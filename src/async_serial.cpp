@@ -29,12 +29,12 @@
 
 #include "async_serial.h"
 
-#include <string>
 #include <algorithm>
-#include <thread>
-#include <mutex>
 #include <boost/bind/bind.hpp>
 #include <boost/shared_array.hpp>
+#include <mutex>
+#include <string>
+#include <thread>
 
 using namespace std;
 using namespace boost;
@@ -45,12 +45,10 @@ using namespace boost;
 
 #ifndef __APPLE__
 
-class AsyncSerialImpl : private boost::noncopyable
-{
-public:
+class AsyncSerialImpl : private boost::noncopyable {
+ public:
   AsyncSerialImpl()
-  : io(), port(io), backgroundThread(), open(false), error(false)
-  {
+      : io(), port(io), backgroundThread(), open(false), error(false) {
   }
 
   boost::asio::io_context io;     ///< Io context object
@@ -72,24 +70,21 @@ public:
 };
 
 AsyncSerial::AsyncSerial()
-: pimpl(new AsyncSerialImpl)
-{
+    : pimpl(new AsyncSerialImpl) {
 }
 
 AsyncSerial::AsyncSerial(
-  const std::string & devname, unsigned int baud_rate, asio::serial_port_base::parity opt_parity,
-  asio::serial_port_base::character_size opt_csize,
-  asio::serial_port_base::flow_control opt_flow, asio::serial_port_base::stop_bits opt_stop)
-: pimpl(new AsyncSerialImpl)
-{
+    const std::string &devname, unsigned int baud_rate, asio::serial_port_base::parity opt_parity,
+    asio::serial_port_base::character_size opt_csize,
+    asio::serial_port_base::flow_control opt_flow, asio::serial_port_base::stop_bits opt_stop)
+    : pimpl(new AsyncSerialImpl) {
   open(devname, baud_rate, opt_parity, opt_csize, opt_flow, opt_stop);
 }
 
 void AsyncSerial::open(
-  const std::string & devname, unsigned int baud_rate, asio::serial_port_base::parity opt_parity,
-  asio::serial_port_base::character_size opt_csize, asio::serial_port_base::flow_control opt_flow,
-  asio::serial_port_base::stop_bits opt_stop)
-{
+    const std::string &devname, unsigned int baud_rate, asio::serial_port_base::parity opt_parity,
+    asio::serial_port_base::character_size opt_csize, asio::serial_port_base::flow_control opt_flow,
+    asio::serial_port_base::stop_bits opt_stop) {
   if (isOpen()) {
     close();
   }
@@ -111,19 +106,16 @@ void AsyncSerial::open(
   pimpl->open = true;     // Port is now open
 }
 
-bool AsyncSerial::isOpen() const
-{
+bool AsyncSerial::isOpen() const {
   return pimpl->open;
 }
 
-bool AsyncSerial::errorStatus() const
-{
+bool AsyncSerial::errorStatus() const {
   lock_guard<mutex> l(pimpl->errorMutex);
   return pimpl->error;
 }
 
-void AsyncSerial::close()
-{
+void AsyncSerial::close() {
   if (!isOpen()) {
     return;
   }
@@ -134,13 +126,12 @@ void AsyncSerial::close()
   pimpl->io.reset();
   if (errorStatus()) {
     throw(boost::system::system_error(
-            boost::system::error_code(),
-            "Error while closing the device"));
+        boost::system::error_code(),
+        "Error while closing the device"));
   }
 }
 
-void AsyncSerial::write(const char * data, size_t size)
-{
+void AsyncSerial::write(const char *data, size_t size) {
   {
     lock_guard<mutex> l(pimpl->writeQueueMutex);
     pimpl->writeQueue.insert(pimpl->writeQueue.end(), data, data + size);
@@ -148,8 +139,7 @@ void AsyncSerial::write(const char * data, size_t size)
   pimpl->io.post(boost::bind(&AsyncSerial::doWrite, this));
 }
 
-void AsyncSerial::write(const std::vector<char> & data)
-{
+void AsyncSerial::write(const std::vector<char> &data) {
   {
     lock_guard<mutex> l(pimpl->writeQueueMutex);
     pimpl->writeQueue.insert(pimpl->writeQueue.end(), data.begin(), data.end());
@@ -157,8 +147,7 @@ void AsyncSerial::write(const std::vector<char> & data)
   pimpl->io.post(boost::bind(&AsyncSerial::doWrite, this));
 }
 
-void AsyncSerial::writeString(const std::string & s)
-{
+void AsyncSerial::writeString(const std::string &s) {
   {
     lock_guard<mutex> l(pimpl->writeQueueMutex);
     pimpl->writeQueue.insert(pimpl->writeQueue.end(), s.begin(), s.end());
@@ -166,8 +155,7 @@ void AsyncSerial::writeString(const std::string & s)
   pimpl->io.post(boost::bind(&AsyncSerial::doWrite, this));
 }
 
-AsyncSerial::~AsyncSerial()
-{
+AsyncSerial::~AsyncSerial() {
   if (isOpen()) {
     try {
       close();
@@ -177,17 +165,15 @@ AsyncSerial::~AsyncSerial()
   }
 }
 
-void AsyncSerial::doRead()
-{
+void AsyncSerial::doRead() {
   pimpl->port.async_read_some(
-    asio::buffer(pimpl->readBuffer, readBufferSize),
-    boost::bind(
-      &AsyncSerial::readEnd, this, asio::placeholders::error,
-      asio::placeholders::bytes_transferred));
+      asio::buffer(pimpl->readBuffer, readBufferSize),
+      boost::bind(
+          &AsyncSerial::readEnd, this, asio::placeholders::error,
+          asio::placeholders::bytes_transferred));
 }
 
-void AsyncSerial::readEnd(const boost::system::error_code & error, size_t bytes_transferred)
-{
+void AsyncSerial::readEnd(const boost::system::error_code &error, size_t bytes_transferred) {
   if (error) {
 #ifdef __APPLE__
     if (error.value() == 45) {
@@ -211,8 +197,7 @@ void AsyncSerial::readEnd(const boost::system::error_code & error, size_t bytes_
   }
 }
 
-void AsyncSerial::doWrite()
-{
+void AsyncSerial::doWrite() {
   // If a write operation is already in progress, do nothing
   if (pimpl->writeBuffer == 0) {
     lock_guard<mutex> l(pimpl->writeQueueMutex);
@@ -221,13 +206,12 @@ void AsyncSerial::doWrite()
     copy(pimpl->writeQueue.begin(), pimpl->writeQueue.end(), pimpl->writeBuffer.get());
     pimpl->writeQueue.clear();
     async_write(
-      pimpl->port, asio::buffer(pimpl->writeBuffer.get(), pimpl->writeBufferSize),
-      boost::bind(&AsyncSerial::writeEnd, this, asio::placeholders::error));
+        pimpl->port, asio::buffer(pimpl->writeBuffer.get(), pimpl->writeBufferSize),
+        boost::bind(&AsyncSerial::writeEnd, this, asio::placeholders::error));
   }
 }
 
-void AsyncSerial::writeEnd(const boost::system::error_code & error)
-{
+void AsyncSerial::writeEnd(const boost::system::error_code &error) {
   if (!error) {
     lock_guard<mutex> l(pimpl->writeQueueMutex);
     if (pimpl->writeQueue.empty()) {
@@ -241,16 +225,15 @@ void AsyncSerial::writeEnd(const boost::system::error_code & error)
     copy(pimpl->writeQueue.begin(), pimpl->writeQueue.end(), pimpl->writeBuffer.get());
     pimpl->writeQueue.clear();
     async_write(
-      pimpl->port, asio::buffer(pimpl->writeBuffer.get(), pimpl->writeBufferSize),
-      boost::bind(&AsyncSerial::writeEnd, this, asio::placeholders::error));
+        pimpl->port, asio::buffer(pimpl->writeBuffer.get(), pimpl->writeBufferSize),
+        boost::bind(&AsyncSerial::writeEnd, this, asio::placeholders::error));
   } else {
     setErrorStatus(true);
     doClose();
   }
 }
 
-void AsyncSerial::doClose()
-{
+void AsyncSerial::doClose() {
   boost::system::error_code ec;
   pimpl->port.cancel(ec);
   if (ec) {
@@ -262,37 +245,32 @@ void AsyncSerial::doClose()
   }
 }
 
-void AsyncSerial::setErrorStatus(bool e)
-{
+void AsyncSerial::setErrorStatus(bool e) {
   lock_guard<mutex> l(pimpl->errorMutex);
   pimpl->error = e;
 }
 
-void AsyncSerial::setReadCallback(const std::function<void(const char *, size_t)> & callback)
-{
+void AsyncSerial::setReadCallback(const std::function<void(const char *, size_t)> &callback) {
   pimpl->callback = callback;
 }
 
-void AsyncSerial::clearReadCallback()
-{
+void AsyncSerial::clearReadCallback() {
   std::function<void(const char *, size_t)> empty;
   pimpl->callback.swap(empty);
 }
 
 #else  //__APPLE__
 
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <termios.h>
 #include <unistd.h>
 
-class AsyncSerialImpl : private boost::noncopyable
-{
-public:
+class AsyncSerialImpl : private boost::noncopyable {
+ public:
   AsyncSerialImpl()
-  : backgroundThread(), open(false), error(false)
-  {
+      : backgroundThread(), open(false), error(false) {
   }
 
   boost::thread backgroundThread;   ///< Thread that runs read operations
@@ -309,24 +287,21 @@ public:
 };
 
 AsyncSerial::AsyncSerial()
-: pimpl(new AsyncSerialImpl)
-{
+    : pimpl(new AsyncSerialImpl) {
 }
 
 AsyncSerial::AsyncSerial(
-  const std::string & devname, unsigned int baud_rate, asio::serial_port_base::parity opt_parity,
-  asio::serial_port_base::character_size opt_csize,
-  asio::serial_port_base::flow_control opt_flow, asio::serial_port_base::stop_bits opt_stop)
-: pimpl(new AsyncSerialImpl)
-{
+    const std::string &devname, unsigned int baud_rate, asio::serial_port_base::parity opt_parity,
+    asio::serial_port_base::character_size opt_csize,
+    asio::serial_port_base::flow_control opt_flow, asio::serial_port_base::stop_bits opt_stop)
+    : pimpl(new AsyncSerialImpl) {
   open(devname, baud_rate, opt_parity, opt_csize, opt_flow, opt_stop);
 }
 
 void AsyncSerial::open(
-  const std::string & devname, unsigned int baud_rate, asio::serial_port_base::parity opt_parity,
-  asio::serial_port_base::character_size opt_csize, asio::serial_port_base::flow_control opt_flow,
-  asio::serial_port_base::stop_bits opt_stop)
-{
+    const std::string &devname, unsigned int baud_rate, asio::serial_port_base::parity opt_parity,
+    asio::serial_port_base::character_size opt_csize, asio::serial_port_base::flow_control opt_flow,
+    asio::serial_port_base::stop_bits opt_stop) {
   if (isOpen()) {
     close();
   }
@@ -418,9 +393,9 @@ void AsyncSerial::open(
       speed = B230400;
       break;
     default: {
-        ::close(pimpl->fd);
-        throw(boost::system::system_error(boost::system::error_code(), "Unsupported baud rate"));
-      }
+      ::close(pimpl->fd);
+      throw(boost::system::system_error(boost::system::error_code(), "Unsupported baud rate"));
+    }
   }
 
   cfsetospeed(&new_attributes, speed);
@@ -446,19 +421,16 @@ void AsyncSerial::open(
   pimpl->backgroundThread.swap(t);
 }
 
-bool AsyncSerial::isOpen() const
-{
+bool AsyncSerial::isOpen() const {
   return pimpl->open;
 }
 
-bool AsyncSerial::errorStatus() const
-{
+bool AsyncSerial::errorStatus() const {
   lock_guard<mutex> l(pimpl->errorMutex);
   return pimpl->error;
 }
 
-void AsyncSerial::close()
-{
+void AsyncSerial::close() {
   if (!isOpen()) {
     return;
   }
@@ -470,34 +442,30 @@ void AsyncSerial::close()
   pimpl->backgroundThread.join();
   if (errorStatus()) {
     throw(boost::system::system_error(
-            boost::system::error_code(),
-            "Error while closing the device"));
+        boost::system::error_code(),
+        "Error while closing the device"));
   }
 }
 
-void AsyncSerial::write(const char * data, size_t size)
-{
+void AsyncSerial::write(const char *data, size_t size) {
   if (::write(pimpl->fd, data, size) != size) {
     setErrorStatus(true);
   }
 }
 
-void AsyncSerial::write(const std::vector<char> & data)
-{
+void AsyncSerial::write(const std::vector<char> &data) {
   if (::write(pimpl->fd, &data[0], data.size()) != data.size()) {
     setErrorStatus(true);
   }
 }
 
-void AsyncSerial::writeString(const std::string & s)
-{
+void AsyncSerial::writeString(const std::string &s) {
   if (::write(pimpl->fd, &s[0], s.size()) != s.size()) {
     setErrorStatus(true);
   }
 }
 
-AsyncSerial::~AsyncSerial()
-{
+AsyncSerial::~AsyncSerial() {
   if (isOpen()) {
     try {
       close();
@@ -507,10 +475,9 @@ AsyncSerial::~AsyncSerial()
   }
 }
 
-void AsyncSerial::doRead()
-{
+void AsyncSerial::doRead() {
   // Read loop in spawned thread
-  for (;; ) {
+  for (;;) {
     int received = ::read(pimpl->fd, pimpl->readBuffer, readBufferSize);
     if (received < 0) {
       if (isOpen() == false) {
@@ -526,39 +493,32 @@ void AsyncSerial::doRead()
   }
 }
 
-void AsyncSerial::readEnd(const boost::system::error_code & error, size_t bytes_transferred)
-{
+void AsyncSerial::readEnd(const boost::system::error_code &error, size_t bytes_transferred) {
   // Not used
 }
 
-void AsyncSerial::doWrite()
-{
+void AsyncSerial::doWrite() {
   // Not used
 }
 
-void AsyncSerial::writeEnd(const boost::system::error_code & error)
-{
+void AsyncSerial::writeEnd(const boost::system::error_code &error) {
   // Not used
 }
 
-void AsyncSerial::doClose()
-{
+void AsyncSerial::doClose() {
   // Not used
 }
 
-void AsyncSerial::setErrorStatus(bool e)
-{
+void AsyncSerial::setErrorStatus(bool e) {
   lock_guard<mutex> l(pimpl->errorMutex);
   pimpl->error = e;
 }
 
-void AsyncSerial::setReadCallback(const std::function<void(const char *, size_t)> & callback)
-{
+void AsyncSerial::setReadCallback(const std::function<void(const char *, size_t)> &callback) {
   pimpl->callback = callback;
 }
 
-void AsyncSerial::clearReadCallback()
-{
+void AsyncSerial::clearReadCallback() {
   std::function<void(const char *, size_t)> empty;
   pimpl->callback.swap(empty);
 }
@@ -570,31 +530,26 @@ void AsyncSerial::clearReadCallback()
 //
 
 CallbackAsyncSerial::CallbackAsyncSerial()
-: AsyncSerial()
-{
+    : AsyncSerial() {
 }
 
 CallbackAsyncSerial::CallbackAsyncSerial(
-  const std::string & devname, unsigned int baud_rate,
-  asio::serial_port_base::parity opt_parity,
-  asio::serial_port_base::character_size opt_csize,
-  asio::serial_port_base::flow_control opt_flow,
-  asio::serial_port_base::stop_bits opt_stop)
-: AsyncSerial(devname, baud_rate, opt_parity, opt_csize, opt_flow, opt_stop)
-{
+    const std::string &devname, unsigned int baud_rate,
+    asio::serial_port_base::parity opt_parity,
+    asio::serial_port_base::character_size opt_csize,
+    asio::serial_port_base::flow_control opt_flow,
+    asio::serial_port_base::stop_bits opt_stop)
+    : AsyncSerial(devname, baud_rate, opt_parity, opt_csize, opt_flow, opt_stop) {
 }
 
-void CallbackAsyncSerial::setCallback(const std::function<void(const char *, size_t)> & callback)
-{
+void CallbackAsyncSerial::setCallback(const std::function<void(const char *, size_t)> &callback) {
   setReadCallback(callback);
 }
 
-void CallbackAsyncSerial::clearCallback()
-{
+void CallbackAsyncSerial::clearCallback() {
   clearReadCallback();
 }
 
-CallbackAsyncSerial::~CallbackAsyncSerial()
-{
+CallbackAsyncSerial::~CallbackAsyncSerial() {
   clearReadCallback();
 }

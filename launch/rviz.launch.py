@@ -39,14 +39,14 @@ def generate_launch_description():
     ldlidar_launch = IncludeLaunchDescription(
         launch_description_source=PythonLaunchDescriptionSource([
             get_package_share_directory('ld19_lidar'),
-            '/launch/lidar.launch'
+            '/launch/lidar.launch.py'
         ]),
     )
 
     rsp_launch = IncludeLaunchDescription(
         launch_description_source=PythonLaunchDescriptionSource([
             get_package_share_directory('ld19_lidar'),
-            '/launch/rsp.launch'
+            '/launch/rsp.launch.py'
         ]),
     )
 

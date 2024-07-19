@@ -73,12 +73,12 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        ldlidar_base:
+        laser:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        ldlidar_link:
+        laser_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -95,9 +95,9 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: true
-        ldlidar_base:
+        laser:
           Value: true
-        ldlidar_link:
+        laser_link:
           Value: true
         map:
           Value: true
@@ -111,8 +111,8 @@ Visualization Manager:
       Tree:
         map:
           odom:
-            ldlidar_base:
-              ldlidar_link:
+            laser:
+              laser_link:
                 {}
       Update Interval: 0
       Value: true
