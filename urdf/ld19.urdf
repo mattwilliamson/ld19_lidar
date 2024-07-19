@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+
+<robot name="ldlidar">
+
+    <!-- This part goes in your urdf before you include this or publish it -->
+    <!-- Or you can do a static transform -->
+    <!-- 
+    <joint name="ldlidar_joint" type="fixed">
+        <parent link="base_link" />
+        <child link="ldlidar_base" />
+        <origin xyz="-0.119 0.0009 0.118" rpy="0 0 0" />
+    </joint> 
+    -->
+
+    <link name="ldlidar_base">
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://ld19_lidar/meshes/LD19.stl" scale="0.001 0.001 0.001" />
+            </geometry>
+            <material name="ldlidar_mat">
+                <color rgba="0.8 0.8 0.8 0.8"/>
+            </material>
+        </visual>
+    </link>
+
+    <joint name="ldlidar_link_joint" type="fixed">
+        <parent link="ldlidar_base"/>
+        <child link="ldlidar_link"/>
+        <origin xyz="0 0 0.02745" rpy="0 0 0" />
+    </joint>
+
+    <link name="ldlidar_link" />
+
+    <gazebo reference="ldlidar_link">
+        <material>Gazebo/Black</material>
+
+        <sensor name="ldlidar_link" type="ray">
+            <pose> 0 0 0 0 0 0 </pose>
+            <visualize>false</visualize>
+            <update_rate>10</update_rate>
+            <ray>
+                <scan>
+                    <horizontal>
+                        <samples>360</samples>
+                        <min_angle>-3.14</min_angle>
+                        <max_angle>3.14</max_angle>
+                    </horizontal>
+                </scan>
+                <range>
+                    <min>0.3</min>
+                    <max>12</max>
+                </range>
+            </ray>
+            <plugin name="laser_controller" filename="libgazebo_ros_ray_sensor.so">
+                <ros>
+                    <argument>~/out:=scan</argument>
+                </ros>
+                <output_type>sensor_msgs/LaserScan</output_type>
+                <frame_name>ldlidar_link</frame_name>
+            </plugin>
+        </sensor>
+    </gazebo>
+
+</robot>

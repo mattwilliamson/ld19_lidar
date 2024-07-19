@@ -81,7 +81,7 @@ auto LD19Node::populate_message(const std::vector<PointData> & laser_data)->void
     // front of the sensor
     int index_offset = (int)map_range(M_PI / 2, 0, M_PI * 2.0, 0, max_index);  // 113;
     index += index_offset;
-    std::cout << "index_offset: " << index_offset << std::endl;
+    // std::cout << "index_offset: " << index_offset << std::endl;
 
     if (index > max_index) {
       index -= max_index;
@@ -91,8 +91,8 @@ auto LD19Node::populate_message(const std::vector<PointData> & laser_data)->void
     }
 
     // int index = (int)((angle - output_.angle_min) / output_.angle_increment);
-    std::cout << "max index:" << max_index << std::endl;
-    std::cout << "deg: " << point.angle << " rads: " << angle << " index: " << index << std::endl;
+    // std::cout << "max index:" << max_index << std::endl;
+    // std::cout << "deg: " << point.angle << " rads: " << angle << " index: " << index << std::endl;
     if (index >= 0 && index < max_index) {
       output_.ranges[index] = range;
       /*If the current content is Nan, it is assigned directly*/

@@ -4,7 +4,7 @@
   <name>ld19_lidar</name>
   <version>0.0.1</version>
   <description>LD19 Lidar Driver</description>
-  <maintainer email="richardw347@gmail.com">parallels</maintainer>
+  <maintainer email="matt@aimatt.com">Matt Williamson</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>

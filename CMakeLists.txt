@@ -56,7 +56,7 @@ install(TARGETS
   ld19_node
   DESTINATION lib/${PROJECT_NAME})
 
-install(DIRECTORY launch
+install(DIRECTORY launch params config meshes
   DESTINATION share/${PROJECT_NAME}
 )
 
