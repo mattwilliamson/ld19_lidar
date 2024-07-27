@@ -10,11 +10,27 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+set(DEPENDENCIES
+    rclcpp
+    # std_msgs
+    sensor_msgs
+    diagnostic_msgs
+    diagnostic_updater
+    # nav2_util
+    # nav2_msgs
+)
+
 # find dependencies
 find_package(Boost 1.40.0 REQUIRED)
 find_package(Threads REQUIRED)
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+# find_package(nav2_util REQUIRED)
+# find_package(nav2_msgs REQUIRED)
+# find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
+find_package(diagnostic_updater REQUIRED)
 
 # find_package(irobot_events_executor REQUIRED)
 # find_package(irobot_lock_free_events_queue REQUIRED)
@@ -37,7 +53,10 @@ target_link_libraries(ld19_node
   ${Boost_LIBRARIES}
   ${CMAKE_THREAD_LIBS_INIT}
 )
-ament_target_dependencies(ld19_node rclcpp sensor_msgs)
+
+ament_target_dependencies(ld19_node
+    ${DEPENDENCIES}
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

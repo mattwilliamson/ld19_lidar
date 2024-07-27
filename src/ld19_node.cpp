@@ -3,21 +3,29 @@
 using namespace std::chrono_literals;
 
 LD19Node::LD19Node()
-: Node("ld19_node"), port_("/dev/ttyUSB0"), frame_id_("laser"), topic_name_("scan"), output_()
-{
+    : Node("ld19_lidar_node"), port_("/dev/ttyUSB0"), frame_id_("laser"), topic_name_("scan"), output_(), diagnostic_(this), status_(Status::INIT), beams_(0), baud_rate_(230400) {
   this->init_parameters();
   publisher_ = this->create_publisher<sensor_msgs::msg::LaserScan>(topic_name_, 10);
   timer_ = this->create_wall_timer(100ms, std::bind(&LD19Node::timer_callback, this));
+
+  // Diagnostic updater
+  diagnostic_.add("Status", this, &LD19Node::callback_updateDiagnostic);
+  diagnostic_.setHardwareID("LD19");
+
+  RCLCPP_INFO(get_logger(), "ld19_lidar_node start");
 }
 
-auto LD19Node::init_parameters()->void
-{
+void LD19Node::init_parameters() {
   this->declare_parameter<std::string>("port", "/dev/ttyUSB0");
   this->declare_parameter<std::string>("frame_id", "laser");
   this->declare_parameter<std::string>("topic_name", "scan");
+  this->declare_parameter<int>("beams", 455);
+  this->declare_parameter<int>("baud_rate", 230400);
   this->get_parameter("port", port_);
   this->get_parameter("frame_id", frame_id_);
   this->get_parameter("topic_name", topic_name_);
+  this->get_parameter("beams", beams_);
+  this->get_parameter("baud_rate", baud_rate_);
 
   output_.header.stamp = this->now();
   output_.header.frame_id = frame_id_;
@@ -27,93 +35,118 @@ auto LD19Node::init_parameters()->void
   output_.range_max = RANGE_MAX;
   output_.angle_increment = output_.time_increment = 0.0;
   output_.scan_time = 0.0;
-  output_.ranges.assign(READING_COUNT, 0.0);
-  output_.intensities.assign(READING_COUNT, 0.0);
+  output_.ranges.assign(beams_, 0.0);
+  output_.intensities.assign(beams_, 0.0);
 }
 
-auto LD19Node::init_device()->bool
-{
+bool LD19Node::init_device() {
   lidar_ = std::make_shared<LiPkg>();
 
   try {
-    serial_port_ = std::make_shared<CallbackAsyncSerial>(port_, BAUDRATE);
-  } catch (const boost::system::system_error & e) {
+    serial_port_ = std::make_shared<CallbackAsyncSerial>(port_, baud_rate_);
+  } catch (const boost::system::system_error &e) {
     RCLCPP_ERROR(this->get_logger(), "Error opening device port: %s: %s", port_.c_str(), e.what());
+    status_ = Status::ERROR;
     return false;
   }
 
   serial_port_->setCallback(
-    [ = ](const char * byte, size_t len) {
-      if (lidar_->Parse((uint8_t *)byte, len)) {
-        lidar_->AssemblePacket();
-      }
-    });
+      [=](const char *byte, size_t len) {
+        if (lidar_->Parse((uint8_t *)byte, len)) {
+          lidar_->AssemblePacket();
+        }
+      });
 
   lidar_->SetPopulateCallback(std::bind(&LD19Node::populate_message, this, std::placeholders::_1));
 
   if (!serial_port_->isOpen()) {
     RCLCPP_ERROR(this->get_logger(), "Error opening device port: %s", port_.c_str());
+    status_ = Status::ERROR;
     return false;
   }
 
   RCLCPP_INFO(this->get_logger(), "Successfully opened device port: %s", port_.c_str());
+  status_ = Status::PUBLISHING;
 
   return true;
 }
 
-auto LD19Node::populate_message(const std::vector<PointData> & laser_data)->void
-{
-  /*Angle resolution, the smaller the resolution, the smaller the error after conversion*/
-  float angle_increment = ANGLE_TO_RADIAN(lidar_->GetSpeed() / 4500);
-  int max_index = std::ceil((ANGLE_MAX - ANGLE_MIN) / angle_increment);
-  output_.header.stamp = this->now();
+void LD19Node::populate_message(const std::vector<PointData> &laser_data) {
+  static bool first_scan = true;
+  double spin_speed = lidar_->GetSpeed();
+  rclcpp::Time start_scan_time = this->now();
+  static rclcpp::Time end_scan_time;
+  float angle_increment = (ANGLE_MAX - ANGLE_MIN) / (float)(beams_ - 1);
+  double scan_time = (start_scan_time.seconds() - end_scan_time.seconds());
+  float time_increment = static_cast<float>(scan_time / (double)(beams_ - 1));
+
+  // Figure out how fast we scan
+  if (first_scan) {
+    first_scan = false;
+    end_scan_time = start_scan_time;
+    return;
+  }
+
+  if (spin_speed <= 0) {
+    return;
+  }
+
+  output_.header.stamp = start_scan_time;
+  output_.time_increment = time_increment;
   output_.angle_increment = angle_increment;
+  output_.scan_time = scan_time;
+
+  // Start with NaN for all measurements
+  output_.ranges.assign(beams_, std::numeric_limits<float>::quiet_NaN());
+  output_.intensities.assign(beams_, std::numeric_limits<float>::quiet_NaN());
+
   for (auto point : laser_data) {
     float range = point.distance / 1000.0;
     float angle = ANGLE_TO_RADIAN(point.angle);
-    // reverse the index of the readings
-    // for some reason the sensor is reading things
-    // backwards
-    int index = map_range(angle, 0, M_PI * 2.0, max_index, 0);
+    float intensity = point.confidence;
 
-    // also adding a 90 degree offset here
-    // as the 0 point of the sensor isn't the
-    // front of the sensor
-    int index_offset = (int)map_range(M_PI / 2, 0, M_PI * 2.0, 0, max_index);  // 113;
-    index += index_offset;
-    // std::cout << "index_offset: " << index_offset << std::endl;
-
-    if (index > max_index) {
-      index -= max_index;
-    }
-    if (index < 0) {
-      index += max_index;
+    if ((point.distance == 0) && (intensity == 0)) {
+      range = std::numeric_limits<float>::quiet_NaN();
+      intensity = std::numeric_limits<float>::quiet_NaN();
     }
 
-    // int index = (int)((angle - output_.angle_min) / output_.angle_increment);
-    // std::cout << "max index:" << max_index << std::endl;
-    // std::cout << "deg: " << point.angle << " rads: " << angle << " index: " << index << std::endl;
-    if (index >= 0 && index < max_index) {
+    int index = static_cast<int>(ceil((angle - ANGLE_MIN) / angle_increment));
+    index = beams_ - index - 1;
+
+    if (index > beams_) {
+      continue;
+    }
+
+    output_.intensities[index] = intensity;
+
+    // If the current content is Nan, it is assigned directly
+    if (std::isnan(output_.ranges[index])) {
       output_.ranges[index] = range;
-      /*If the current content is Nan, it is assigned directly*/
-      if (std::isnan(output_.ranges[index])) {
+    } else {
+      // Otherwise, only when the distance is less than the current range
+      if (range < output_.ranges[index]) {
         output_.ranges[index] = range;
-      } else { /*Otherwise, only when the distance is less than the current value, it can be re assigned*/
-        if (range < output_.ranges[index]) {
-          output_.ranges[index] = range;
-        }
       }
-      output_.intensities[index] = point.confidence;
     }
   }
+
+  end_scan_time = start_scan_time;
 }
 
-auto LD19Node::timer_callback()->void
-{
+void LD19Node::timer_callback() {
   if (lidar_->IsFrameReady()) {
     if (publisher_->get_subscription_count() > 0) {
       publisher_->publish(output_);
     }
     lidar_->ResetFrameReady();
+  }
+}
+
+void LD19Node::callback_updateDiagnostic(diagnostic_updater::DiagnosticStatusWrapper &stat) {
+  if (status_ == Status::PUBLISHING) {
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Publishing");
+    stat.addf("Scan Speed", "%.3f Hz", lidar_->GetSpeed());
+  } else if (status_ == Status::ERROR) {
+    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Error");
   }
 }

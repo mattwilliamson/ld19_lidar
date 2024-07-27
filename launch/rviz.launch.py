@@ -9,51 +9,22 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    
-    node_name = LaunchConfiguration('node_name')
-
-    # Launch arguments
-    declare_node_name_cmd = DeclareLaunchArgument(
-        'node_name',
-        default_value='ldlidar_node',
-        description='Name of the node'
-    )
+    ld = LaunchDescription()
+    share_dir = get_package_share_directory('ld19_lidar')
 
     # RVIZ2 settings
-    rviz2_config = os.path.join(
-        get_package_share_directory('ld19_lidar'),
-        'config',
-        'ldlidar.rviz'
-    )
+    rviz2_config = os.path.join(share_dir, 'config', 'ldlidar.rviz')
 
     # RVIZ2node
-    rviz2_node = Node(
-        package='rviz2',
-        executable='rviz2',
-        name='rviz2',
-        output='screen',
-        arguments=[["-d"], [rviz2_config]]
-    )
+    rviz2_node = Node(package='rviz2', executable='rviz2', name='rviz2', output='screen', arguments=[["-d"], [rviz2_config]])
+    ld.add_action(rviz2_node)
 
     # Launch node
-    ldlidar_launch = IncludeLaunchDescription(
-        launch_description_source=PythonLaunchDescriptionSource([
-            get_package_share_directory('ld19_lidar'),
-            '/launch/lidar.launch.py'
-        ]),
-    )
-
-    rsp_launch = IncludeLaunchDescription(
-        launch_description_source=PythonLaunchDescriptionSource([
-            get_package_share_directory('ld19_lidar'),
-            '/launch/rsp.launch.py'
-        ]),
-    )
-
-    ld = LaunchDescription()
-
-    ld.add_action(rviz2_node)
+    ldlidar_launch = IncludeLaunchDescription(launch_description_source=PythonLaunchDescriptionSource([share_dir, '/launch/node.launch.py']))
     ld.add_action(ldlidar_launch)
+
+    # Robot State Publisher
+    rsp_launch = IncludeLaunchDescription(launch_description_source=PythonLaunchDescriptionSource([share_dir, '/launch/rsp.launch.py']))
     ld.add_action(rsp_launch)
 
     return ld

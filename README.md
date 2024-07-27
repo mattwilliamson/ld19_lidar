@@ -20,7 +20,7 @@ Setup device alias to `/dev/ldlidar`
 sudo apt install libudev-dev
 
 cat << EOF | sudo tee /etc/udev/rules.d/99-ldlidar.rules
-# set the udev rule , make the device_port be fixed by ldlidar
+# set the udev rule to alias the device at /dev/ldlidar
 # CP210x USB Device
 KERNEL=="ttyUSB*", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", MODE:="0777", SYMLINK+="ldlidar"
 EOF
@@ -47,7 +47,14 @@ colcon build --symlink-install --packages-select=ld19_lidar
 
 ```sh
 source install/setup.sh
-ros2 launch ld19_lidar lidar.launch.py
+ros2 launch ld19_lidar node.launch.py
+```
+
+## SLAM
+
+```sh
+source install/setup.sh
+ros2 launch ld19_lidar slam.launch.py
 ```
 
 ## Credits
